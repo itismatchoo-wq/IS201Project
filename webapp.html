@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flappy Laptop</title>
+    <style>
+        /*
+        ===================
+        CSS STYLES
+        ===================
+        */
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #303030; /* Dark background */
+            font-family: 'Arial', sans-serif;
+            overflow: hidden; /* Hide scrollbars */
+            user-select: none; /* Prevent text selection */
+            touch-action: manipulation; /* Improved touch responsiveness */
+        }
+
+        #game-container {
+            width: 400px;
+            height: 600px;
+            border: 5px solid #00c853; /* Green border for "tech" look */
+            background-color: #e0f7fa; /* Light blue sky */
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0, 200, 83, 0.8);
+            cursor: pointer;
+        }
+
+        /* NEW SLEEK LAPTOP DESIGN */
+        #laptop {
+            /* Collision box remains the same size for consistent physics */
+            width: 70px; /* Slightly wider */
+            height: 40px; 
+            background-color: transparent; 
+            position: absolute;
+            left: 50px;
+            top: 280px;
+            
+            /* Animation/Physics styles (applied by JS) */
+            transform: rotate(0deg);
+            transition: transform 0.1s linear;
+            z-index: 10;
+        }
+
+        /* Closed Laptop Body - Use ::before */
+        #laptop::before {
+            content: '';
+            position: absolute;
+            top: 5px;
+            left: 5px; 
+            width: 60px; /* Laptop width */
+            height: 30px; /* Laptop height */
+            background-color: #9e9e9e; /* Sleek silver/grey body */
+            border: 1px solid #424242;
+            border-radius: 4px;
+            
+            /* Shadow for depth */
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.5), inset 0 0 5px rgba(255, 255, 255, 0.3);
+        }
+
+        /* Logo/Indicator - Use ::after */
+        #laptop::after {
+            content: '';
+            position: absolute;
+            top: 15px;
+            left: 30px;
+            width: 10px;
+            height: 10px;
+            background-color: #00e5ff; /* Glowing blue logo/indicator light */
+            border-radius: 50%;
+            box-shadow: 0 0 8px #00e5ff;
+            z-index: 11;
+        }
+        /* END NEW LAPTOP DESIGN */
+
+
+        .motherboard {
+            position: absolute;
+            width: 70px;
+            background-color: #004d40; /* Dark green for motherboard */
+            border: 3px solid #00c853; /* Bright green trace border */
+            box-shadow: inset 0 0 10px #00c853, 0 0 10px rgba(0, 0, 0, 0.5);
+            /* Creating a simple "trace" pattern with a gradient */
+            background-image: repeating-linear-gradient(
+                45deg,
+                transparent,
+                transparent 5px,
+                #00c853 5px,
+                #00c853 6px
+            );
+        }
+
+        .bottom {
+            top: 0;
+        }
+
+        .top {
+            bottom: 0;
+        }
+
+        #score-board {
+            position: absolute;
+            top: 20px;
+            width: 100%;
+            text-align: center;
+            font-size: 3em;
+            color: #ffffff;
+            text-shadow: 2px 2px 4px #000000;
+            font-weight: bold;
+            z-index: 20;
+        }
+
+        #start-screen, #game-over-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            font-size: 1.5em;
+            z-index: 30;
+        }
+
+        #start-screen h1 {
+            color: #00c853;
+            font-size: 2.5em;
+            margin-bottom: 5px;
+        }
+
+        #start-screen p {
+            font-size: 0.9em;
+        }
+
+        #game-over-screen h2 {
+            color: #ff1744; /* Red for game over */
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+
+        .button {
+            padding: 10px 20px;
+            margin-top: 20px;
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #000000;
+            background-color: #00c853;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .button:hover {
+            background-color: #69f0ae;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="score-board">0</div>
+    <div id="laptop"></div>
+
+    <div id="start-screen">
+        <h1>Flappy Laptop</h1>
+        <p>Avoid the Motherboards!</p>
+        <p>Click anywhere or press **SPACE** to boost up.</p>
+        <button class="button" onclick="startGame()">Start Game</button>
+    </div>
+
+    <div id="game-over-screen" style="display: none;">
+        <h2>GAME OVER</h2>
+        <p>Your Final Score: <span id="final-score">0</span></p>
+        <button class="button" onclick="resetGame()">Play Again</button>
+    </div>
+</div>
+
+<script>
+    /*
+    ===================
+    JAVASCRIPT LOGIC
+    ===================
+    */
+    const gameContainer = document.getElementById('game-container');
+    const laptop = document.getElementById('laptop');
+    const scoreBoard = document.getElementById('score-board');
+    const startScreen = document.getElementById('start-screen');
+    const gameOverScreen = document.getElementById('game-over-screen');
+    const finalScoreDisplay = document.getElementById('final-score');
+
+    const containerHeight = 600;
+    const containerWidth = 400;
+
+    let laptopY = 280; // Initial Y position
+    let laptopGravity = 0.5;
+    let laptopVelocity = 0;
+    const jumpBoost = -10; // Negative for upward movement
+    let isGameOver = false;
+    let gameLoop;
+    let motherboardInterval;
+    let score = 0;
+    const gapSize = 300; // <<< Still WIDE GAP SIZE
+    const motherboardWidth = 70;
+    let gameStarted = false;
+
+    // --- Core Game Functions ---
+
+    function applyGravity() {
+        if (!gameStarted || isGameOver) return;
+
+        // Apply gravity and update position
+        laptopVelocity += laptopGravity;
+        laptopY += laptopVelocity;
+        laptop.style.top = `${laptopY}px`;
+
+        // Apply rotation (tilt)
+        const rotation = Math.min(90, laptopVelocity * 5); // Max 90 degrees down
+        laptop.style.transform = `rotate(${rotation}deg)`;
+
+        // Check for boundary collision (floor and ceiling)
+        if (laptopY > containerHeight - laptop.offsetHeight || laptopY < 0) {
+            endGame();
+        }
+    }
+
+    function jump() {
+        if (isGameOver) return;
+        laptopVelocity = jumpBoost;
+    }
+
+    function createMotherboard() {
+        // Randomly determine the height of the top motherboard
+        const minHeight = 50;
+        // The total height available for the top/bottom boards is containerHeight - gapSize
+        const maxHeight = containerHeight - gapSize - minHeight; 
+        const topHeight = Math.floor(Math.random() * (maxHeight - minHeight + 1)) + minHeight;
+        const bottomHeight = containerHeight - topHeight - gapSize;
+
+        // Create the top motherboard
+        const topBoard = document.createElement('div');
+        topBoard.classList.add('motherboard', 'top');
+        topBoard.style.height = `${topHeight}px`;
+        topBoard.style.left = `${containerWidth}px`;
+        topBoard.dataset.passed = 'false';
+        gameContainer.appendChild(topBoard);
+
+        // Create the bottom motherboard
+        const bottomBoard = document.createElement('div');
+        bottomBoard.classList.add('motherboard', 'bottom');
+        bottomBoard.style.height = `${bottomHeight}px`;
+        bottomBoard.style.left = `${containerWidth}px`;
+        gameContainer.appendChild(bottomBoard);
+
+        // Start movement
+        moveMotherboard(topBoard, bottomBoard);
+    }
+
+    function moveMotherboard(topBoard, bottomBoard) {
+        let boardX = containerWidth;
+        const moveSpeed = 3; // Speed of the boards
+
+        function animateBoards() {
+            if (isGameOver) return;
+
+            boardX -= moveSpeed;
+            topBoard.style.left = `${boardX}px`;
+            bottomBoard.style.left = `${boardX}px`;
+
+            // Check for collision
+            if (checkCollision(topBoard) || checkCollision(bottomBoard)) {
+                endGame();
+            }
+
+            // Check if laptop has passed the board (score update)
+            if (boardX + motherboardWidth < laptop.offsetLeft && topBoard.dataset.passed === 'false') {
+                score++;
+                scoreBoard.textContent = score;
+                topBoard.dataset.passed = 'true';
+            }
+
+            // Remove boards when they exit the screen
+            if (boardX + motherboardWidth < 0) {
+                topBoard.remove();
+                bottomBoard.remove();
+                return; // Stop the animation frame for these boards
+            }
+
+            requestAnimationFrame(animateBoards);
+        }
+        requestAnimationFrame(animateBoards);
+    }
+
+    function checkCollision(board) {
+        // Get dimensions and positions
+        const laptopRect = laptop.getBoundingClientRect();
+        const boardRect = board.getBoundingClientRect();
+        const containerRect = gameContainer.getBoundingClientRect();
+
+        // Adjust for container's position to get relative coordinates
+        const laptopLeft = laptopRect.left - containerRect.left;
+        const laptopRight = laptopRect.right - containerRect.left;
+        const laptopTop = laptopRect.top - containerRect.top;
+        const laptopBottom = laptopRect.bottom - containerRect.top;
+
+        const boardLeft = boardRect.left - containerRect.left;
+        const boardRight = boardRect.right - containerRect.left;
+        const boardTop = boardRect.top - containerRect.top;
+        const boardBottom = boardRect.bottom - containerRect.top;
+
+        // Simple AABB (Axis-Aligned Bounding Box) collision check
+        const xOverlap = (laptopLeft < boardRight) && (laptopRight > boardLeft);
+        const yOverlap = (laptopTop < boardBottom) && (laptopBottom > boardTop);
+
+        return xOverlap && yOverlap;
+    }
+
+    function startGame() {
+        if (gameStarted) return; // Prevent double start
+
+        // Reset state
+        isGameOver = false;
+        gameStarted = true;
+        score = 0;
+        scoreBoard.textContent = score;
+        laptopY = 280;
+        laptopVelocity = 0;
+        laptop.style.top = `${laptopY}px`;
+        laptop.style.transform = 'rotate(0deg)';
+
+        // Clear existing boards
+        document.querySelectorAll('.motherboard').forEach(mb => mb.remove());
+
+        // Hide screens
+        startScreen.style.display = 'none';
+        gameOverScreen.style.display = 'none';
+        scoreBoard.style.display = 'block';
+
+        // Start game logic
+        gameLoop = setInterval(applyGravity, 1000 / 60); // 60 FPS
+        motherboardInterval = setInterval(createMotherboard, 2000); // Spawn new board every 2 seconds
+    }
+
+    function endGame() {
+        if (isGameOver) return;
+        isGameOver = true;
+        gameStarted = false;
+
+        // Stop game loops
+        clearInterval(gameLoop);
+        clearInterval(motherboardInterval);
+
+        // Show game over screen
+        finalScoreDisplay.textContent = score;
+        gameOverScreen.style.display = 'flex';
+        scoreBoard.style.display = 'none';
+
+        // Add a slight tilt for crash effect
+        laptop.style.transform = 'rotate(90deg)';
+    }
+
+    function resetGame() {
+        // Simply call startGame to reset and start over
+        startGame();
+    }
+
+    // --- Event Listeners ---
+
+    // Click anywhere in the game container to jump
+    gameContainer.addEventListener('click', () => {
+        if (gameStarted && !isGameOver) {
+            jump();
+        } else if (!gameStarted && !isGameOver) {
+            startGame();
+            jump(); // Jump immediately on the first click
+        }
+    });
+
+    // Spacebar to jump
+    document.addEventListener('keydown', (e) => {
+        if (e.code === 'Space') {
+            e.preventDefault(); // Prevent scrolling
+            if (gameStarted && !isGameOver) {
+                jump();
+            } else if (!gameStarted && !isGameOver) {
+                startGame();
+                jump();
+            } else if (isGameOver) {
+                resetGame();
+            }
+        }
+    });
+
+    // Initial setup: The game starts on the start screen
+    document.addEventListener('DOMContentLoaded', () => {
+        scoreBoard.style.display = 'none'; // Hide score until game starts
+    });
+
+</script>
+</body>
+</html>
